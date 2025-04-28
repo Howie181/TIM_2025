@@ -1,0 +1,71 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1912                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default         backward; //Euler;
+}
+
+gradSchemes
+{
+    default         leastSquares; //Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+//    div(phi,U)      Gauss linear; //LUST grad(U); //linear; //Upwind grad(U);
+    div(phi,U)	    Gauss DEShybrid
+        linear                    // scheme 1
+        linearUpwind grad(U)      // scheme 2
+        hmax
+        0.65                      // DES coefficient, typically = 0.65
+        1                         // Reference velocity scale
+        1                         // Reference length scale
+        0                         // Minimum sigma limit (0-1)
+        1                         // Maximum sigma limit (0-1)
+        1.0e-03;                  // Limiter of B function, typically 1e-03
+
+    div(phi,k)      Gauss linear; //limitedLinear 1; //upwind; //linearUpwind limited; //upwind;
+    div(phi,B)      Gauss linear; //limitedLinear 1; //upwind; //linearUpwind limited;
+    div(B)	    Gauss linear;
+    div(phi,nuTilda) Gauss limitedLinear 1;
+    div((nuEff*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+
+wallDist
+{
+    method	    meshWave;
+}
+
+
+// ************************************************************************* //

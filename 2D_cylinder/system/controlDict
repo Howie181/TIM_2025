@@ -1,0 +1,138 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1912                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs (turbulenceModelSchemes);
+
+application     pimpleFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         500.0;
+
+deltaT          5e-4;
+
+writeControl    adjustableRunTime;
+
+writeInterval   10; //10;
+
+purgeWrite      2;
+
+writeFormat     ascii;
+
+writePrecision  10;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+adjustTimeStep	no; //yes;
+
+maxCo		0.85; //7; //5; //25; //0.85;
+
+maxDeltaT	5e-4;
+
+// ************************************************************************* //
+
+///////////////////////////////////////////////////////////////////////////
+functions
+{
+planeSampling
+    {
+        type            surfaces;
+        functionObjectLibs ("libsampling.so");
+        enabled         true;
+
+        outputControl   timeStep;
+        outputInterval  10; // every 100 steps
+
+        surfaceFormat   vtk;
+        fields          (U);
+
+        surfaces
+        (
+            midSpanPlane
+            {
+                type        	plane;
+		planeType	pointAndNormal;
+		pointAndNormalDict
+		{
+                	basePoint       (0 0 0.151);
+                	normalVector    (0 0 1);
+		}
+		interpolate	false; //true;
+		triangulate	false;
+
+            }
+        )
+    };
+
+forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            ("libforces.so");
+        enabled         true;
+        patches         ("walls");       // Replace "cylinder" with the actual name of your cylinder wa$        log             yes;
+        rho             rhoInf;             // For incompressible flows
+        rhoInf          1.0;                // Set your fluid density
+        magUInf         0.585;              // Set your freestream velocity magnitude
+        lRef            0.1;                // Set your reference length (e.g., cylinder diameter)
+        Aref            0.03;                // Set your reference area (e.g., cylinder diameter for 2D$        CofR            (0 0 0);            // Set the center of rotation for moment calculations
+        dragDir         (1 0 0);            // Set the direction of drag (usually the flow direction)
+        liftDir         (0 1 0);            // Set the direction of lift (perpendicular to drag in the $        pitchAxis       (0 0 1);            // Set the axis for pitching moment (for 2D, usually the z-$        writeControl    timeStep;          // How often to write the output
+        writeInterval   1;                 // Write every time step
+    };
+
+    probes
+    {
+        type            probes;
+        functionObjectLibs ("libsampling.so");
+        enabled         true;
+        writeControl    timeStep; //adjustableRunTime;  // Output at every time step
+        writeInterval   1;         // Every time step
+        log             true;      // Optional: Writes probe data to log file
+        timeStart       0;         // Optional: Start time for probe data
+
+        probeLocations
+        (
+            (0.3 0.0 0.15)
+            (0.5 0.0 0.15)
+            (0.069 0.069 0.15)
+            (0.13 0.04 0.15)
+            (0.175 0 0.15)
+        );
+
+        fields
+        (
+            U
+            p
+        );
+
+    };
+
+}
+///////////////////////////////////////////////////////////////////////////
+
+
+
