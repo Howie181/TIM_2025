@@ -1,0 +1,174 @@
+import pygame
+import random
+import math
+import os
+import subprocess
+
+pygame.init()
+screen = pygame.display.set_mode((800, 600))  # Keeping the original frame height
+pygame.display.set_caption("Adjustable Fireworks")
+clock = pygame.time.Clock()
+
+# ---------------- USER SETTINGS -----------------
+WHITE = (255, 255, 255)
+SCREEN_WIDTH = 600
+SCREEN_HEIGHT = 400
+CEILING_Y = 200  # manual height at which all fireworks will explode
+
+
+ROCKET_MIN_SPEED = -2.0   # Make this closer to 0 to lower the height
+ROCKET_MAX_SPEED = -8.0
+EXPLOSION_PARTICLE_COUNT = 75  # You can now easily change this 🎆
+EXPLOSION_SPREAD = (1.5, 3.5)
+FIREWORK_LAUNCH_CHANCE = 20
+TRAIL_LENGTH = 10
+FPS = 60
+
+SHOW_ROCKET_DOT = False   # Set this to True if you want a visible rocket head
+ROCKET_DOT_SIZE = 2       # Smaller size for rocket head if visible
+# ------------------------------------------------
+
+COLORS = [
+    (255, 0, 0),       # Pure Red
+    (0, 255, 0),       # Pure Green
+    (0, 0, 255),       # Pure Blue
+    (255, 255, 0),     # Yellow
+    (0, 255, 255),     # Cyan
+    (255, 0, 255),     # Magenta
+    (255, 128, 0),     # Orange
+    (255, 0, 128),     # Hot Pink
+    (128, 0, 255),     # Violet
+    (0, 255, 128),     # Aquamarine
+    (255, 255, 255)    # White Sparkle
+]
+
+# Create a directory for the frames if it doesn't exist
+if not os.path.exists('frames'):
+    os.makedirs('frames')
+
+
+class Particle:
+    def __init__(self, x, y, vel_x, vel_y, color, explode=False):
+        self.x = x
+        self.y = y
+        self.vel_x = vel_x
+        self.vel_y = vel_y
+        self.color = color
+        self.explode = explode
+        self.life = 90 if explode else 60
+        self.trail = []
+
+    def update(self):
+        self.vel_y += 0.05 if self.explode else 0.02
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > TRAIL_LENGTH:
+            self.trail.pop(0)
+        self.life -= 1
+
+    def draw(self, surface):
+        # Draw fading trail
+        for i, (tx, ty) in enumerate(self.trail):
+            fade = int(255 * (i + 1) / TRAIL_LENGTH)
+            trail_color = (self.color[0], self.color[1], self.color[2], fade)
+            s = pygame.Surface((2, 2), pygame.SRCALPHA)
+            s.fill(trail_color)
+            surface.blit(s, (tx, ty))
+
+        # Optional rocket dot
+        if self.life > 0 and (self.explode or SHOW_ROCKET_DOT):
+            radius = 1.5 if self.explode else ROCKET_DOT_SIZE
+            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), radius)
+
+class Firework:
+    def __init__(self):
+        self.x = random.randint(100, SCREEN_WIDTH - 100)
+        self.y = SCREEN_HEIGHT
+        self.color = random.choice(COLORS)
+        rocket_speed = random.uniform(ROCKET_MIN_SPEED, ROCKET_MAX_SPEED)
+        self.rocket = Particle(self.x, self.y, 0, rocket_speed, self.color)
+        self.exploded = False
+        self.particles = []
+
+    def update(self):
+        if not self.exploded:
+            self.rocket.update()
+            if self.rocket.vel_y >= 0 or self.rocket.y <= CEILING_Y:
+                self.exploded = True
+                for _ in range(EXPLOSION_PARTICLE_COUNT):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(*EXPLOSION_SPREAD)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    self.particles.append(Particle(self.rocket.x, self.rocket.y, vx, vy, self.color, explode=True))
+        else:
+            for p in self.particles:
+                p.update()
+
+    def draw(self, surface):
+        if not self.exploded:
+            self.rocket.draw(surface)
+        else:
+            for p in self.particles:
+                p.draw(surface)
+
+    def is_dead(self):
+        return self.exploded and all(p.life <= 0 for p in self.particles)
+
+fireworks = []
+
+frame_count = 0
+start_time = pygame.time.get_ticks()  # Start time for the 5s limit
+running = True
+while running:
+    screen.fill(WHITE)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    if random.randint(0, FIREWORK_LAUNCH_CHANCE) == 0:
+        fireworks.append(Firework())
+
+    for fw in fireworks[:]:
+        fw.update()
+        fw.draw(screen)
+        if fw.is_dead():
+            fireworks.remove(fw)
+
+    # Save the current frame
+    frame_filename = f"frames/frame_{frame_count:04d}.png"
+    pygame.image.save(screen, frame_filename)
+    frame_count += 1
+
+    # Stop the simulation after 5 seconds
+    if pygame.time.get_ticks() - start_time >= 15000:  # 5000 ms = 5 seconds
+        running = False
+
+    # Draw the ceiling line (commented out for now, as you requested)
+    # pygame.draw.line(screen, (200, 200, 200), (0, CEILING_Y), (SCREEN_WIDTH, CEILING_Y), 1)
+
+    pygame.display.flip()
+    clock.tick(FPS)
+
+# Run ffmpeg to create the video after the loop finishes
+subprocess.run([
+    "ffmpeg",
+    "-framerate", "60",              # Input frame rate
+    "-i", "frames/frame_%04d.png",   # Input frames
+    "-t", "10",                       # Limit the video duration to 5 seconds
+    "-c:v", "libx264",               # Codec: H.264
+    "-pix_fmt", "yuv420p",            # Pixel format
+    "fireworks.mp4"                  # Output file
+])
+
+
+# Clean up the frames after video is created
+for filename in os.listdir('frames'):
+    file_path = os.path.join('frames', filename)
+    os.remove(file_path)
+
+pygame.quit()
+
+
